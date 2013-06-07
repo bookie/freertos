@@ -96,11 +96,7 @@ task.h is included from an application file. */
 
 #define queueERRONEOUS_UNBLOCK			( -1 )
 
-/* Effectively make a union out of the xQUEUE structure. */
-#define pxMutexHolder					pcTail
-#define uxQueueType						pcHead
-#define uxRecursiveCallCount			pcReadFrom
-#define queueQUEUE_IS_MUTEX				NULL
+#define queueQUEUE_IS_MUTEX				( 0 )
 
 /* Semaphores do not actually store or copy data, so have an items size of
 zero. */
@@ -115,11 +111,20 @@ zero. */
  */
 typedef struct QueueDefinition
 {
-	signed char *pcHead;					/*< Points to the beginning of the queue storage area. */
-	signed char *pcTail;					/*< Points to the byte at the end of the queue storage area.  Once more byte is allocated than necessary to store the queue items, this is used as a marker. */
+	union {
+		signed char *pcHead;				/*< Points to the beginning of the queue storage area. */
+		portBASE_TYPE uxQueueType;			/*< Used to identify a mutex by comparison to queueQUEUE_IS_MUTEX */
+	};
+	union {
+		signed char *pcTail;				/*< Points to the byte at the end of the queue storage area.  Once more byte is allocated than necessary to store the queue items, this is used as a marker. */
+		xTaskHandle pxMutexHolder;			/*< Stores the current holder of a mutex */
+	};
 
 	signed char *pcWriteTo;					/*< Points to the free next place in the storage area. */
-	signed char *pcReadFrom;				/*< Points to the last place that a queued item was read from. */
+	union {
+		signed char *pcReadFrom;			/*< Points to the last place that a queued item was read from. */
+		portBASE_TYPE uxRecursiveCallCount; /*< Current recursive mutex lock counter */
+	};
 
 	xList xTasksWaitingToSend;				/*< List of tasks that are blocked waiting to post onto this queue.  Stored in priority order. */
 	xList xTasksWaitingToReceive;			/*< List of tasks that are blocked waiting to read from this queue.  Stored in priority order. */
@@ -359,6 +364,12 @@ xQueueHandle xReturn = NULL;
 			of the queue. */
 			pxNewQueue->pcWriteTo = NULL;
 			pxNewQueue->pcReadFrom = NULL;
+
+			#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+			{
+				pxNewQueue->uxRecursiveCallCount = 0;
+			}
+			#endif
 
 			/* Each mutex has a length of 1 (like a binary semaphore) and
 			an item size of 0 as nothing is actually copied into or out
