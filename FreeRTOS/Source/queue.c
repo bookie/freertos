@@ -360,6 +360,12 @@ xQueueHandle xReturn = NULL;
 			pxNewQueue->pcWriteTo = NULL;
 			pxNewQueue->pcReadFrom = NULL;
 
+			#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+			{
+				pxNewQueue->uxRecursiveCallCount = 0;
+			}
+			#endif
+
 			/* Each mutex has a length of 1 (like a binary semaphore) and
 			an item size of 0 as nothing is actually copied into or out
 			of the mutex. */
@@ -457,7 +463,7 @@ xQueueHandle xReturn = NULL;
 			uxRecursiveCallCount is only modified by the mutex holder, and as
 			there can only be one, no mutual exclusion is required to modify the
 			uxRecursiveCallCount member. */
-			( pxMutex->uxRecursiveCallCount )--;
+			pxMutex->uxRecursiveCallCount = (signed char *)((portBASE_TYPE)pxMutex->uxRecursiveCallCount - 1);
 
 			/* Have we unwound the call count? */
 			if( pxMutex->uxRecursiveCallCount == 0 )
@@ -500,7 +506,7 @@ xQueueHandle xReturn = NULL;
 
 		if( pxMutex->pxMutexHolder == xTaskGetCurrentTaskHandle() )
 		{
-			( pxMutex->uxRecursiveCallCount )++;
+			pxMutex->uxRecursiveCallCount = (signed char *)((portBASE_TYPE)pxMutex->uxRecursiveCallCount + 1);
 			xReturn = pdPASS;
 		}
 		else
@@ -511,7 +517,7 @@ xQueueHandle xReturn = NULL;
 			we may have blocked to reach here. */
 			if( xReturn == pdPASS )
 			{
-				( pxMutex->uxRecursiveCallCount )++;
+				pxMutex->uxRecursiveCallCount = (signed char *)((portBASE_TYPE)pxMutex->uxRecursiveCallCount + 1);
 			}
 			else
 			{
