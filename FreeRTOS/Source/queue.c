@@ -96,11 +96,7 @@ task.h is included from an application file. */
 
 #define queueERRONEOUS_UNBLOCK			( -1 )
 
-/* Effectively make a union out of the xQUEUE structure. */
-#define pxMutexHolder					pcTail
-#define uxQueueType						pcHead
-#define uxRecursiveCallCount			pcReadFrom
-#define queueQUEUE_IS_MUTEX				NULL
+#define queueQUEUE_IS_MUTEX				( 0 )
 
 /* Semaphores do not actually store or copy data, so have an items size of
 zero. */
@@ -130,6 +126,15 @@ typedef struct QueueDefinition
 
 	volatile signed portBASE_TYPE xRxLock;	/*< Stores the number of items received from the queue (removed from the queue) while the queue was locked.  Set to queueUNLOCKED when the queue is not locked. */
 	volatile signed portBASE_TYPE xTxLock;	/*< Stores the number of items transmitted to the queue (added to the queue) while the queue was locked.  Set to queueUNLOCKED when the queue is not locked. */
+
+	#if ( configUSE_MUTEXES == 1 )
+		portBASE_TYPE uxQueueType;			/*< Used to identify a mutex by comparison to queueQUEUE_IS_MUTEX */
+		xTaskHandle pxMutexHolder;			/*< Stores the current holder of a mutex */
+	#endif
+
+	#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+		portBASE_TYPE uxRecursiveCallCount; /*< Current recursive mutex lock counter */
+	#endif
 
 	#if ( configUSE_TRACE_FACILITY == 1 )
 		unsigned char ucQueueNumber;
@@ -359,6 +364,12 @@ xQueueHandle xReturn = NULL;
 			of the queue. */
 			pxNewQueue->pcWriteTo = NULL;
 			pxNewQueue->pcReadFrom = NULL;
+
+			#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+			{
+				pxNewQueue->uxRecursiveCallCount = 0;
+			}
+			#endif
 
 			/* Each mutex has a length of 1 (like a binary semaphore) and
 			an item size of 0 as nothing is actually copied into or out
